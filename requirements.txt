@@ -1,0 +1,3 @@
+# Dependencias del proyecto (ver Claude/Codigo.md — Convenciones).
+# Fijar versión exacta al agregar cada paquete: paquete==X.Y.Z
+# Instalar con: pip install -r requirements.txt
