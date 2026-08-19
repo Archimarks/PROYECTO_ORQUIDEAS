@@ -1,0 +1,10 @@
+﻿ID_METABOLITO,NOMBRE_METABOLITO,CLASE_QUIMICA,SUPERCLASE_QUIMICA,DESCRIPCION
+MTB_01,Caffeine,Metilxantina,Alcaloide
+MTB_02,Chlorogenic Acid,"Acido fenolico (acido cafeoilquinico, 5-CQA)",Polifenol
+MTB_03,Chlorogenic acid quinone,Acido fenolico (quinona oxidada de CQA),Polifenol
+MTB_04,Lauryl diethanolamide,,
+MTB_05,Plantaginin / Kaempferol-3-O-glucoside,Iridoide glucosidico / Flavonoide (flavonol glucosido),Terpenoide / Polifenol
+MTB_06,Quinic acid,Acido organico (ciclitol),
+MTB_07,Rutin,Flavonoide (flavonol glucosido),Polifenol
+MTB_08,Sucrose,Azucar (disacarido),Carbohidrato
+MTB_09,Theobromine,Metilxantina,Alcaloide

@@ -1,0 +1,10 @@
+﻿ID_CONDICION_ENSAYO,CONDICION_ENSAYO,DESCRIPCION
+CE_01,Infusion acuosa,
+CE_02,Extracto Soxhlet acetato de etilo/etanol,
+CE_03,Extracto etanolico total,
+CE_04,Extracto acuoso,
+CE_05,Extracto alcoholico,
+CE_06,Rata albina hembra,Modelo animal del ensayo
+CE_07,Bebida de guayusa (tiempo de infusion variable),
+CE_08,Macrofagos RAW 264.7,Linea celular usada en el ensayo
+CE_09,Hoja seca,

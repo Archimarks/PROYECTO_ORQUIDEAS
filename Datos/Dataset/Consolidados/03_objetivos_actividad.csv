@@ -1,0 +1,11 @@
+﻿ID_OBJETIVO,OBJETIVO,DESCRIPCION
+OBJ_01,Staphylococcus aureus,"Bacteria gram positiva, patogeno comun de piel e infecciones"
+OBJ_02,Escherichia coli,"Bacteria gram negativa, patogeno enterico comun"
+OBJ_03,Trichophyton rubrum,"Hongo dermatofito, causante de tina/dermatofitosis"
+OBJ_04,Microsporum spp.,Genero de hongos dermatofitos
+OBJ_05,Porphyromonas gingivalis,"Bacteria anaerobia, patogeno periodontal"
+OBJ_06,Prevotella intermedia,"Bacteria anaerobia, patogeno periodontal"
+OBJ_07,Via oral en rata (LD50),Modelo de toxicidad aguda por administracion oral
+OBJ_08,Artemia salina,Crustaceo usado como bioensayo general de toxicidad (LC50)
+OBJ_09,Oxido nitrico (NO),Radical libre / especie reactiva de nitrogeno
+OBJ_10,Contenido de cafeina,Alcaloide xantinico responsable del efecto estimulante

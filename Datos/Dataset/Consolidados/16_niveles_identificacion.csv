@@ -1,0 +1,5 @@
+﻿ID_NIVEL,NIVEL_IDENTIFICACION,DESCRIPCION
+NIV_I,I,Confirmado con estandar autentico
+NIV_II,II,Anotado putativamente (libreria espectral)
+NIV_III,III,Clase quimica putativa
+NIV_IV,IV,Desconocido

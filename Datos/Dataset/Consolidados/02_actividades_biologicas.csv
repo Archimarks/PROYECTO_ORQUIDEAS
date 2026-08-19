@@ -1,0 +1,6 @@
+﻿ID_ACTIVIDAD,ACTIVIDAD_BIOLOGICA,DESCRIPCION
+ACT_01,Antimicrobiano,Actividad que inhibe o elimina bacterias
+ACT_02,Antifungico,Actividad que inhibe o elimina hongos
+ACT_03,Toxicidad,Efecto toxico medido en un organismo o modelo de bioensayo
+ACT_04,Antioxidante,Capacidad de neutralizar radicales libres o especies reactivas
+ACT_05,Estimulante,Efecto estimulante sobre el sistema nervioso u otro sistema

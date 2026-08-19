@@ -1,46 +1,180 @@
 # Esquema base del dataset (molde)
 
-Este dataset se construye en **4 tablas separadas** en vez de una sola tabla plana,
-porque la información real tiene 4 "granos" distintos (4 cosas diferentes de las
-que hay una cantidad distinta de registros):
+Este dataset está normalizado en **30 tablas**: 25 son **catálogos** (listas
+cortas de referencia, con un ID + el valor + una descripción, reutilizadas
+por muchas filas) y 5 son tablas **hub/hecho** (`especies`, `muestras`,
+`muestra_factor`, `especie_actividad`, `picos`) que se quedan sueltas en la
+raíz porque son las que se llenan directamente con datos reales. Los
+catálogos están agrupados en subcarpetas por dominio para que la carpeta
+siga siendo navegable.
 
-| Tabla | 1 fila = | Cuántas filas |
+```
+Datos/Base/
+├── 01_especies.csv            (hub — 1 fila por especie)
+├── 02_muestras.csv            (hecho)
+├── 03_muestra_factor.csv      (hecho)
+├── 04_especie_actividad.csv   (hecho)
+├── 05_picos.csv               (hecho)
+├── Catalogos_Especie/
+│   ├── tipos_planta.csv
+│   ├── ciclos_vida.csv
+│   ├── habitos_crecimiento.csv
+│   ├── reinos.csv
+│   ├── filos.csv
+│   ├── clases_taxonomicas.csv
+│   ├── ordenes.csv
+│   ├── familias.csv
+│   └── generos.csv
+├── Catalogos_Actividad_Biologica/
+│   ├── actividades_biologicas.csv
+│   ├── objetivos_actividad.csv
+│   ├── metricas_ensayo.csv
+│   ├── unidades.csv
+│   ├── condiciones_ensayo.csv
+│   └── referencias.csv
+├── Catalogos_Muestras/
+│   ├── tipos_muestra.csv
+│   ├── tipos_cultivo.csv
+│   ├── partes_planta.csv
+│   ├── ubicaciones.csv
+│   ├── metodos_extraccion.csv
+│   ├── solventes_extraccion.csv
+│   ├── columnas_cromatograficas.csv
+│   └── factores_experimentales.csv
+└── Catalogos_Picos/
+    ├── metabolitos.csv
+    └── niveles_identificacion.csv
+```
+
+`01_especies.csv` vive en la raíz (no dentro de `Catalogos_Especie/`) porque,
+aunque tiene forma de catálogo, es un **hub**: lo referencian directamente
+`02_muestras.csv` y `04_especie_actividad.csv`, igual que ellas se llena con
+una fila real por cada especie del dataset — no es una lista cerrada de
+categorías como sí lo son sus catálogos satélite (`tipos_planta`, `reinos`...).
+
+## Regla de IDs: siempre número entero
+
+**Todo `ID_X` es un número entero autoincremental (1, 2, 3...), nunca un
+código con prefijo de texto** (nada de `ACT_01`, `TP_01`, `ILEX_GUAYUSA`).
+Cuando ese identificador natural/legible (un código de laboratorio, un
+nombre científico) es útil conservarlo, vive en una columna **aparte**,
+nunca mezclado en el propio ID:
+
+- `01_especies.csv`: `ID_ESPECIE` es un entero; el nombre legible ya vive en
+  `NOMBRE_CIENTIFICO` (ej. `Ilex guayusa`) — no hace falta una columna de
+  código adicional, ese campo ya cumple ese rol.
+- `02_muestras.csv`: `ID_MUESTRA` e `ID_MUESTRA_FISICA` son enteros; el
+  código real de laboratorio/archivo (ej. `100_MB_53_NEG`, `100_MB_53`) vive
+  en las columnas nuevas `CODIGO_MUESTRA` y `CODIGO_MUESTRA_FISICA`.
+- Los 25 catálogos ya traían su valor legible en una columna separada
+  (`ACTIVIDAD_BIOLOGICA`, `TIPO_PLANTA`, `REINO`...), así que para ellos el
+  cambio es solo de tipo de dato en `ID_X`: entero en vez de código con
+  prefijo, sin necesidad de agregar ninguna columna.
+
+Todas las tablas de hechos (`02_muestras.csv`, `03_muestra_factor.csv`,
+`04_especie_actividad.csv`, `05_picos.csv`) referencian estos catálogos por
+ese entero.
+
+---
+
+## Filosofía: ¿catálogo o columna normal?
+
+Regla que se aplicó en todas las tablas: si un valor **se repite entre
+filas** y tiene un vocabulario más o menos cerrado (un tipo de muestra, un
+solvente, una unidad, una cita, un rango taxonómico...), se saca a su propio
+catálogo con ID. Si el valor es **específico de esa fila** y no tiene
+sentido reutilizarlo (un código de muestra, una coordenada RT/m-z, el número
+exacto de un resultado), se queda como columna normal en la tabla de hechos.
+
+Esto evolucionó en varios pasos dentro de esta misma conversación: primero
+`ACTIVIDAD_BIOLOGICA` era un texto libre que mezclaba categoría + objetivo +
+método, lo que fragmentaba la misma actividad real en categorías falsas al
+agrupar. Se separó en catálogos, luego se aplicó la misma lógica a
+`muestras`, `especie_actividad` y `picos`, después a la taxonomía de
+`especies` (`REINO`…`GENERO`), luego se agruparon los 25 catálogos en
+subcarpetas por dominio, luego se estandarizó que todo ID fuera un entero
+puro en vez de un código con prefijo inventado por mí, y finalmente
+`EXPOSICION_LUZ`/`ESTADIO_MADUREZ` (columnas fijas específicas del diseño
+experimental de *este* estudio) se sacaron a un catálogo de factores +
+`03_muestra_factor.csv`, porque otro estudio va a medir factores distintos
+(temperatura, tipo de fertilización...) y columnas fijas no escalan.
+
+---
+
+## Resumen de tablas
+
+| Carpeta / archivo | Tipo | Contiene |
 |---|---|---|
-| `01_especies.csv` | una **especie** (taxonomía y rasgos biológicos fijos) | 1 por especie — reusada por todos sus extractos |
-| `02_muestras.csv` | una **corrida/inyección** en el equipo (un extracto en un modo de ionización) | 1 por corrida — un mismo extracto puede tener 2 (POS y NEG) |
-| `03_muestra_actividad.csv` | una actividad biológica medida sobre un **extracto físico** | 0, 1 o varias por extracto |
-| `04_picos.csv` | un pico/metabolito detectado por MS en una corrida | decenas, cientos o miles |
+| `01_especies.csv` | **hub** | una especie (taxonomía y rasgos) |
+| `02_muestras.csv` | **hecho** | una corrida/inyección en el equipo |
+| `03_muestra_factor.csv` | **hecho** | un factor experimental medido sobre una muestra (luz, edad, temperatura...) |
+| `04_especie_actividad.csv` | **hecho** | una actividad biológica reportada para una especie |
+| `05_picos.csv` | **hecho** | un pico/metabolito detectado por MS en una corrida |
+| `Catalogos_Especie/tipos_planta.csv` | catálogo | árbol, arbusto, liana, hierba |
+| `Catalogos_Especie/ciclos_vida.csv` | catálogo | anual, bienal, perenne |
+| `Catalogos_Especie/habitos_crecimiento.csv` | catálogo | trepadora, rastrera, erecta |
+| `Catalogos_Especie/reinos.csv` | catálogo | reino taxonómico |
+| `Catalogos_Especie/filos.csv` | catálogo | filo taxonómico |
+| `Catalogos_Especie/clases_taxonomicas.csv` | catálogo | clase taxonómica |
+| `Catalogos_Especie/ordenes.csv` | catálogo | orden taxonómico |
+| `Catalogos_Especie/familias.csv` | catálogo | familia taxonómica |
+| `Catalogos_Especie/generos.csv` | catálogo | género taxonómico |
+| `Catalogos_Actividad_Biologica/actividades_biologicas.csv` | catálogo | categoría general de actividad (Antimicrobiano...) |
+| `Catalogos_Actividad_Biologica/objetivos_actividad.csv` | catálogo | sobre qué actúa (*S. aureus*, óxido nítrico...) |
+| `Catalogos_Actividad_Biologica/metricas_ensayo.csv` | catálogo | tipo de métrica (MIC, LD50, LC50...) |
+| `Catalogos_Actividad_Biologica/unidades.csv` | catálogo | unidad de medida (mg/mL, mm, %...) |
+| `Catalogos_Actividad_Biologica/condiciones_ensayo.csv` | catálogo | preparación/condición del ensayo |
+| `Catalogos_Actividad_Biologica/referencias.csv` | catálogo | citas bibliográficas |
+| `Catalogos_Muestras/tipos_muestra.csv` | catálogo | Sample / Blank / QC / SubQC |
+| `Catalogos_Muestras/tipos_cultivo.csv` | catálogo | sistema de cultivo |
+| `Catalogos_Muestras/partes_planta.csv` | catálogo | órgano del que se sacó el extracto |
+| `Catalogos_Muestras/ubicaciones.csv` | catálogo | sitio de recolección |
+| `Catalogos_Muestras/metodos_extraccion.csv` | catálogo | técnica de extracción |
+| `Catalogos_Muestras/solventes_extraccion.csv` | catálogo | solvente usado |
+| `Catalogos_Muestras/columnas_cromatograficas.csv` | catálogo | columna del equipo LC |
+| `Catalogos_Muestras/factores_experimentales.csv` | catálogo | nombre de un factor/variable experimental (luz, edad, temperatura...) |
+| `Catalogos_Picos/metabolitos.csv` | catálogo | nombre de compuesto + clase/superclase química |
+| `Catalogos_Picos/niveles_identificacion.csv` | catálogo | confianza de identificación MS (I–IV) |
+
+---
 
 ## Relación entre las tablas
 
 ```
-ID_ESPECIE         (1 especie)  ──< 02_muestras                (N extractos/corridas de esa especie)
-ID_MUESTRA_FISICA (1 extracto) ──< ID_MUESTRA (N corridas: POS, NEG, ...) ──< 04_picos  (N picos por corrida)
-ID_MUESTRA_FISICA (1 extracto) ──< 03_muestra_actividad                    (N actividades por extracto)
+                                 ┌─< Catalogos_Especie/tipos_planta
+                                 ├─< Catalogos_Especie/ciclos_vida
+01_especies ─────────────────────┼─< Catalogos_Especie/habitos_crecimiento
+   │  (ID_ESPECIE, entero)       └─< Catalogos_Especie/{reinos,filos,
+   │                                  clases_taxonomicas,ordenes,
+   │                                  familias,generos}
+   │
+   ├──< 02_muestras ──< 05_picos
+   │        │  │           └─< Catalogos_Picos/{metabolitos,niveles_identificacion}
+   │        │  └─< Catalogos_Muestras/{tipos_muestra,tipos_cultivo,partes_planta,
+   │        │      ubicaciones,metodos_extraccion,solventes_extraccion,
+   │        │      columnas_cromatograficas}
+   │        │
+   │        └──< 03_muestra_factor
+   │                 └─< Catalogos_Muestras/factores_experimentales
+   │
+   └──< 04_especie_actividad
+            └─< Catalogos_Actividad_Biologica/{actividades_biologicas,
+                objetivos_actividad,metricas_ensayo,unidades,
+                condiciones_ensayo,referencias}
 ```
 
-Confirmaste que un mismo extracto se inyecta en modo POS y en modo NEG, generando
-dos `ID_MUESTRA` distintos (ej. `100_MB_53_POS` y `100_MB_53_NEG`), pero la
-actividad biológica (DPPH, IC50, etc.) se midió **una sola vez** sobre el
-extracto. Por eso:
-
-- La taxonomía y los rasgos biológicos fijos de una especie (reino…especie,
-  tipo de planta, ciclo de vida, hábito de crecimiento) **no cambian entre
-  extractos** de la misma especie — por eso viven en `01_especies.csv`, una
-  tabla aparte enlazada por `ID_ESPECIE`. Así, si tienes 5 extractos de
-  *Passiflora edulis* (distinta parte, solvente u origen), la taxonomía se
-  escribe una sola vez y se corrige en un solo lugar.
-- `02_muestras.csv` tiene **dos columnas de identificador**: `ID_MUESTRA`
-  (la corrida específica, la que va en `04_picos.csv`) e `ID_MUESTRA_FISICA`
-  (el extracto real, compartido por sus corridas POS y NEG, la que va en
-  `03_muestra_actividad.csv`). Si en algún caso no hay pares POS/NEG y cada
-  corrida es un extracto independiente, simplemente pon el mismo valor en
-  ambas columnas (`ID_MUESTRA_FISICA = ID_MUESTRA`).
-- `03_muestra_actividad.csv` se enlaza por `ID_MUESTRA_FISICA`, no por
-  `ID_MUESTRA` — así el resultado del ensayo biológico no se duplica ni se
-  contradice entre la corrida POS y la NEG del mismo extracto.
-- `04_picos.csv` se enlaza por `ID_MUESTRA` (la corrida), porque el m/z sí
-  depende del modo de ionización.
+Un extracto se inyecta en modo POS y en modo NEG, generando dos `ID_MUESTRA`
+distintos que comparten `ID_MUESTRA_FISICA`. La actividad biológica, en
+cambio, casi nunca viene del mismo estudio ni del mismo extracto físico que
+la metabolómica MS — se reporta en la literatura **a nivel de especie**, en
+artículos aparte. Por eso `04_especie_actividad.csv` se enlaza por
+`ID_ESPECIE` y no por `ID_MUESTRA_FISICA`. Los factores experimentales
+(`03_muestra_factor.csv`) tampoco son columnas fijas de `02_muestras.csv` —
+cada estudio define sus propios factores en
+`Catalogos_Muestras/factores_experimentales.csv` y los registra ahí, uno por
+fila, en vez de forzar columnas como `EXPOSICION_LUZ`/`ESTADIO_MADUREZ` que
+solo tienen sentido para el diseño experimental de este estudio en
+particular.
 
 ---
 
@@ -51,12 +185,23 @@ extractos de la misma especie.
 
 | Columna | Descripción | Notas |
 |---|---|---|
-| `ID_ESPECIE` | código único de la especie | llave que usa `02_muestras.csv` |
-| `NOMBRE_CIENTIFICO` | género + especie (ej. `Passiflora edulis`) | |
-| `REINO`…`ESPECIE` | jerarquía taxonómica completa | |
-| `TIPO_PLANTA` | ej. árbol, arbusto, liana, hierba | |
-| `CICLO_VIDA` | ej. anual, bienal, perenne | |
-| `HABITO_CRECIMIENTO` | ej. trepadora, rastrera, erecta | |
+| `ID_ESPECIE` | entero autoincremental | llave que usan `02_muestras.csv` y `04_especie_actividad.csv` |
+| `NOMBRE_CIENTIFICO` | género + especie (ej. `Passiflora edulis`) | la etiqueta legible de la especie |
+| `ID_REINO` | debe existir en `Catalogos_Especie/reinos.csv` | |
+| `ID_FILO` | debe existir en `Catalogos_Especie/filos.csv` | |
+| `ID_CLASE_TAXONOMICA` | debe existir en `Catalogos_Especie/clases_taxonomicas.csv` | |
+| `ID_ORDEN` | debe existir en `Catalogos_Especie/ordenes.csv` | |
+| `ID_FAMILIA` | debe existir en `Catalogos_Especie/familias.csv` | |
+| `ID_GENERO` | debe existir en `Catalogos_Especie/generos.csv` | |
+| `ESPECIE` | epíteto específico (ej. `edulis` en *Passiflora edulis*) | texto libre, casi 1:1 con la especie, no se catalogó |
+| `ID_TIPO_PLANTA` | debe existir en `Catalogos_Especie/tipos_planta.csv` | ej. árbol, arbusto, liana, hierba |
+| `ID_CICLO_VIDA` | debe existir en `Catalogos_Especie/ciclos_vida.csv` | ej. anual, bienal, perenne |
+| `ID_HABITO_CRECIMIENTO` | debe existir en `Catalogos_Especie/habitos_crecimiento.csv` | ej. trepadora, rastrera, erecta |
+
+Los 6 catálogos de taxonomía no están modelados como jerarquía anidada entre
+sí (cada uno es una lista plana independiente) — se van a repetir en cuanto
+agregues más especies, pero navegar la jerarquía completa entre ellos no
+hacía falta con una sola especie cargada.
 
 **Blank y QC no tienen especie:** no crees una fila en esta tabla para
 blancos ni controles de calidad — en `02_muestras.csv` su `ID_ESPECIE`
@@ -67,127 +212,205 @@ simplemente queda vacío.
 ## 02_muestras.csv
 
 Una fila por **corrida/inyección**. Metadata fija de la muestra, la planta y
-el método analítico.
+el método analítico — casi todo referenciado por ID entero a un catálogo.
 
 | Columna | Descripción | Notas |
 |---|---|---|
-| `ID_MUESTRA` | código único de la corrida/archivo inyectado (ej. `100_MB_53_NEG`) | llave que usa `04_picos.csv` |
-| `ID_MUESTRA_FISICA` | código del extracto físico real, compartido entre sus corridas POS/NEG (ej. `100_MB_53`) | llave que usa `03_muestra_actividad.csv` |
-| `TIPO_MUESTRA` | `Sample` (muestra real), `Blank` (blanco de ruido), `QC` (pool de control de calidad de todas las muestras) o `SubQC` (pool de control por nivel de un factor, ej. solo muestras de una ubicación) | ver nota abajo, **muy importante** |
-| `LOTE` | tanda o día en que se procesó esta corrida (o el identificador del batch de origen si no hay fecha por muestra) | sirve para detectar efecto lote/deriva del equipo entre días, **no es el lote de cosecha de la planta** |
-| `ID_ESPECIE` | código de la especie | llave que usa `01_especies.csv`; ver nota Blank/QC |
-| `TIPO_CULTIVO` | ej. silvestre, invernadero, campo abierto | |
-| `PARTE_ESTUDIADA` | órgano del que se sacó el extracto (ej. hoja, raíz, corteza, fruto) | |
-| `ORIGEN_GEOGRAFICO` | país, región o coordenadas de recolección | |
-| `EXPOSICION_LUZ` | condición de luz del cultivo (ej. sombra, luz directa) | opcional — solo si el estudio la controla como factor experimental |
-| `ESTADIO_MADUREZ` | edad o estado de madurez de la planta/hoja al momento de la recolección | opcional — solo si el estudio la controla como factor experimental |
-| `METODO_EXTRACCION` | ej. maceración, Soxhlet, ultrasonido | |
-| `SOLVENTE_EXTRACCION` | ej. metanol, etanol 80%, agua | |
-| `MODO_IONIZACION` | `POS` o `NEG` | coincide con el sufijo de `ID_MUESTRA` |
-| `COLUMNA_CROMATOGRAFICA` | ej. Fase Reversa (RP), HILIC | |
+| `ID_MUESTRA` | entero autoincremental | llave que usan `03_muestra_factor.csv` y `05_picos.csv` |
+| `CODIGO_MUESTRA` | código real de laboratorio/archivo (ej. `100_MB_53_NEG`) | el identificador legible — ya no vive en `ID_MUESTRA` |
+| `ID_MUESTRA_FISICA` | entero autoincremental | agrupa las corridas del mismo extracto (comparten el mismo valor) |
+| `CODIGO_MUESTRA_FISICA` | código real del extracto físico (ej. `100_MB_53`) | el identificador legible del extracto |
+| `ID_TIPO_MUESTRA` | debe existir en `Catalogos_Muestras/tipos_muestra.csv` | Sample / Blank / QC / SubQC — ver nota abajo, **muy importante** |
+| `LOTE` | tanda o día en que se procesó esta corrida (o el batch de origen si no hay fecha por muestra) | texto libre, no un catálogo |
+| `ID_ESPECIE` | debe existir en `01_especies.csv` | vacío para Blank; ver nota abajo |
+| `ID_TIPO_CULTIVO` | debe existir en `Catalogos_Muestras/tipos_cultivo.csv` | vacío para Blank |
+| `ID_PARTE_PLANTA` | debe existir en `Catalogos_Muestras/partes_planta.csv` | vacío para Blank |
+| `ID_UBICACION` | debe existir en `Catalogos_Muestras/ubicaciones.csv` | vacío para Blank |
+| `ID_METODO_EXTRACCION` | debe existir en `Catalogos_Muestras/metodos_extraccion.csv` | |
+| `ID_SOLVENTE` | debe existir en `Catalogos_Muestras/solventes_extraccion.csv` | |
+| `MODO_IONIZACION` | `POS` o `NEG` | coincide con el sufijo de `CODIGO_MUESTRA` — no se catalogó, es un enum de 2 valores fijo del método analítico |
+| `ID_COLUMNA` | debe existir en `Catalogos_Muestras/columnas_cromatograficas.csv` | |
 
-**Sobre `TIPO_MUESTRA` — Blank no es "planta"; QC/SubQC depende de qué se puso en el pool:**
-un `Blank` (blanco, para medir ruido de fondo, ej. agua ultrapura) **no tiene especie
-real** — deja vacíos `ID_ESPECIE`, `TIPO_CULTIVO` y `ORIGEN_GEOGRAFICO`, no inventes
-datos ahí. Un `QC` (pool de control de calidad, mezcla de todas las muestras, inyectado
-varias veces para medir estabilidad del equipo) o un `SubQC` (mezcla de las muestras que
-comparten un nivel de un factor, ej. todas las de una misma ubicación, para resaltar el
-efecto de ese factor) **sí pueden tener especie real** si el pool se hizo exclusivamente
-con extracto de las propias muestras — en ese caso llena `ID_ESPECIE` igual que en
-`Sample`. Si el pool mezcla varias especies o ubicaciones, deja `ORIGEN_GEOGRAFICO` (y
-`EXPOSICION_LUZ`/`ESTADIO_MADUREZ` si aplica) vacíos o descritos como "pool multi-x" en
-vez de forzar un solo valor. Estas filas (Blank, QC y SubQC) sí van a tener picos en
-`04_picos.csv` (se usan para filtrar ruido y medir reproducibilidad de cada feature entre
-corridas), pero **nunca** van a tener entradas en `03_muestra_actividad.csv`.
+**¿Dónde quedaron `EXPOSICION_LUZ` y `ESTADIO_MADUREZ`?** Ya no son columnas
+de esta tabla — eran específicas del diseño experimental de *este* estudio
+(chakra × edad × luz), y otro estudio va a medir factores distintos
+(temperatura, tipo de fertilización, época de cosecha...). Se movieron a
+`03_muestra_factor.csv`, ver esa sección.
+
+**Sobre `ID_TIPO_MUESTRA` — Blank no es "planta"; QC/SubQC depende de qué se
+puso en el pool:** un `Blank` (blanco, para medir ruido de fondo, ej. agua
+ultrapura) **no tiene especie real** — deja vacíos `ID_ESPECIE`,
+`ID_TIPO_CULTIVO`, `ID_UBICACION`, no inventes datos ahí. Un `QC` (pool de
+control de calidad, mezcla de todas las muestras) o un `SubQC` (mezcla de
+muestras que comparten un nivel de un factor, ej. una sola ubicación) **sí
+pueden tener especie real** si el pool se hizo exclusivamente con extracto de
+las propias muestras. Si el pool mezcla varias especies o ubicaciones, deja
+`ID_UBICACION` vacío o usa una fila de `Catalogos_Muestras/ubicaciones.csv`
+tipo "pool multi-ubicación" en vez de forzar un solo valor. Estas filas
+(Blank, QC y SubQC) sí van a tener picos en `05_picos.csv`, pero como
+`04_especie_actividad.csv` se enlaza por `ID_ESPECIE` (que ellas no tienen),
+quedan automáticamente fuera de esa tabla sin necesitar una regla aparte.
 
 ---
 
-## 03_muestra_actividad.csv
+## 03_muestra_factor.csv
 
-Una fila por cada actividad biológica medida sobre un extracto. Si un
-extracto es antioxidante Y antimicrobiano, son 2 filas.
+Una fila por cada factor/variable experimental medida sobre una muestra. Si
+una muestra se registró bajo 3 factores (ej. ubicación, edad y luz — aunque
+`ID_UBICACION` ya vive en `02_muestras.csv` porque casi siempre aplica, los
+demás factores del diseño van aquí), son 3 filas.
 
 | Columna | Descripción | Notas |
 |---|---|---|
-| `ID_MUESTRA_FISICA` | debe existir en `02_muestras.csv` | agrupa las corridas POS/NEG de ese extracto |
-| `ACTIVIDAD_BIOLOGICA` | tipo de actividad: antioxidante, antimicrobiano, toxicidad, etc. | usa siempre el mismo texto exacto (ideal: lista cerrada de valores) |
-| `VALOR_RESULTADO` | el número real del ensayo (IC50, % de inhibición, MIC...) | vacío si solo se sabe la categoría sin un valor cuantitativo |
+| `ID_MUESTRA` | debe existir en `02_muestras.csv` | |
+| `ID_FACTOR` | debe existir en `Catalogos_Muestras/factores_experimentales.csv` | ej. exposición de luz, estadio de madurez, temperatura... |
+| `VALOR` | el valor de ese factor para esta muestra (ej. `Sombra`, `Temprana (4-6 años)`) | texto libre — el valor en sí no se catalogó porque varía mucho según el factor |
 
-**Por qué se separaron `ACTIVIDAD_BIOLOGICA` y `VALOR_RESULTADO`:** dijiste
-que la actividad puede ser "la capacidad antioxidante, si inhibe una
-bacteria, la toxicidad o un valor IC50" — eso son dos cosas distintas: **qué
-tipo de actividad es** (categoría) y **cuánto dio el ensayo** (número). Con
-las dos columnas separadas, el mismo esquema sirve tanto si vas a hacer
-clasificación (¿tiene o no tiene actividad X? — con `VALOR_RESULTADO`
-vacío) como si vas a hacer regresión (predecir el IC50 exacto — usando
-`VALOR_RESULTADO`).
-
-**Nota:** antes esta tabla también tenía `UNIDAD_RESULTADO`, `METODO_ENSAYO`
-y `REFERENCIA_FUENTE` (unidad del valor, técnica del ensayo, y si el dato
-viene de un ensayo propio o de literatura). Se quitaron para simplificar el
-molde. Si más adelante necesitas distinguir un ensayo medido de un dato
-heredado de literatura (importante para no confundir a un modelo — ver
-riesgo de fuga por especie que hablamos antes), puedes anotarlo aparte o
-recuperar esas columnas.
+**Por qué esta tabla existe en vez de columnas fijas como
+`EXPOSICION_LUZ`/`ESTADIO_MADUREZ`:** esas columnas eran específicas del
+diseño factorial de *este* estudio de Ilex guayusa. Un estudio distinto
+podría medir temperatura de cultivo, tipo de fertilización, época de
+cosecha, humedad relativa, o cualquier otra variable — columnas fijas en el
+molde no escalan a estudios futuros con diseños experimentales diferentes.
+Con este catálogo + tabla de hechos, cada estudio registra los factores que
+le apliquen sin tocar el esquema, exactamente el mismo patrón que se usó
+para `ACTIVIDAD_BIOLOGICA`.
 
 ---
 
-## 04_picos.csv
+## 04_especie_actividad.csv
+
+Una fila por cada actividad biológica reportada para una **especie**, sobre
+un objetivo y con una métrica concretos — no por extracto físico individual.
+
+| Columna | Descripción | Notas |
+|---|---|---|
+| `ID_ESPECIE` | debe existir en `01_especies.csv` | a nivel de especie completa, no del extracto usado en la MS |
+| `ID_ACTIVIDAD` | debe existir en `Catalogos_Actividad_Biologica/actividades_biologicas.csv` | categoría general: Antimicrobiano, Antioxidante... |
+| `ID_OBJETIVO` | debe existir en `Catalogos_Actividad_Biologica/objetivos_actividad.csv` | sobre qué actúa: el organismo, molécula o compuesto concreto |
+| `ID_METRICA` | debe existir en `Catalogos_Actividad_Biologica/metricas_ensayo.csv` | cómo se midió: MIC, LD50, LC50, Halo de inhibición, % remoción... |
+| `VALOR_NUMERICO` | el número (o rango, o valor con `>`/`<`) del resultado | ej. `18`, `0.50-1.00`, `>5000` — se deja como texto porque no siempre es un float puro |
+| `ID_UNIDAD` | debe existir en `Catalogos_Actividad_Biologica/unidades.csv` | mg/mL, mm, %, µg/mL... |
+| `ID_CONDICION_ENSAYO` | debe existir en `Catalogos_Actividad_Biologica/condiciones_ensayo.csv` | preparación/condición bajo la que se midió — puede ir vacío |
+| `ID_REFERENCIA` | debe existir en `Catalogos_Actividad_Biologica/referencias.csv` | cita del artículo/estudio de donde sale este valor |
+
+**Por qué se descompuso `VALOR_RESULTADO` en 4 columnas:** antes era un solo
+texto como `"MIC = 18 mg/mL (infusion acuosa)"`, que mezclaba la métrica, el
+número, la unidad y la condición del ensayo. Con columnas separadas, cada
+pregunta se responde con un filtro directo por ID.
+
+---
+
+## 05_picos.csv
 
 Una fila por cada pico/metabolito detectado en una corrida (`ID_MUESTRA`).
 
 | Columna | Descripción | Notas |
 |---|---|---|
 | `ID_MUESTRA` | debe existir en `02_muestras.csv` (nivel corrida, no extracto) | |
-| `ID_FEATURE` | identificador del pico/feature | déjalo vacío por ahora, se genera con script alineando m/z+RT entre todas las corridas |
+| `ID_FEATURE` | identificador entero del pico/feature | vacío hasta correr el script de alineación m/z+RT |
 | `RELACION_MASA_CARGA` ($m/z$) | "peso" de la molécula leído por el equipo | |
 | `TIEMPO_RETENCION_MINUTOS` | minuto en que el compuesto salió de la columna | |
 | `ALTURA_PICO` | abundancia/concentración relativa del compuesto | sé consistente: si mezclas altura y área entre corridas, anótalo |
-| `NOMBRE_METABOLITO` | nombre del compuesto (ej. Ácido Quínico, Sacarosa) | vacío si no se identificó — válido y esperado |
-| `NIVEL_IDENTIFICACION` | confianza de la identificación: I, II, III o IV (estándar internacional) | I = confirmado con estándar auténtico, II = anotado putativamente (librería espectral), III = clase química putativa, IV = desconocido |
-| `CLASE_QUIMICA` / `SUPERCLASE_QUIMICA` | familia química (ej. Flavonoides, Terpenos, Alcaloides) | vacío si no identificado |
+| `ID_METABOLITO` | debe existir en `Catalogos_Picos/metabolitos.csv` | vacío si no se identificó — válido y esperado (la mayoría de los picos no se identifican) |
+| `ID_NIVEL` | debe existir en `Catalogos_Picos/niveles_identificacion.csv` | confianza de la identificación, I a IV — se llena incluso si `ID_METABOLITO` está vacío (nivel IV = desconocido) |
 
 ---
 
-## Ejemplo completo (extracto con corridas POS+NEG, Blank y QC)
+## Catálogos simples (mismo patrón: ID + valor + descripción)
+
+Todos comparten la misma forma: `ID_X` (entero), `X` (el valor legible),
+`DESCRIPCION` (el de `Catalogos_Picos/metabolitos.csv` además trae
+`CLASE_QUIMICA` y `SUPERCLASE_QUIMICA`). Se crea una fila la primera vez que
+aparece ese valor y se reutiliza el ID en todas las filas de hechos que lo
+necesiten.
+
+| Archivo | Columna ID | Columna valor | Referenciado desde |
+|---|---|---|---|
+| `Catalogos_Actividad_Biologica/actividades_biologicas.csv` | `ID_ACTIVIDAD` | `ACTIVIDAD_BIOLOGICA` | `04_especie_actividad.ID_ACTIVIDAD` |
+| `Catalogos_Actividad_Biologica/objetivos_actividad.csv` | `ID_OBJETIVO` | `OBJETIVO` | `04_especie_actividad.ID_OBJETIVO` |
+| `Catalogos_Actividad_Biologica/metricas_ensayo.csv` | `ID_METRICA` | `METRICA` | `04_especie_actividad.ID_METRICA` |
+| `Catalogos_Actividad_Biologica/unidades.csv` | `ID_UNIDAD` | `UNIDAD` | `04_especie_actividad.ID_UNIDAD` |
+| `Catalogos_Actividad_Biologica/condiciones_ensayo.csv` | `ID_CONDICION_ENSAYO` | `CONDICION_ENSAYO` | `04_especie_actividad.ID_CONDICION_ENSAYO` |
+| `Catalogos_Actividad_Biologica/referencias.csv` | `ID_REFERENCIA` | `REFERENCIA_CITA` | `04_especie_actividad.ID_REFERENCIA` |
+| `Catalogos_Muestras/tipos_muestra.csv` | `ID_TIPO_MUESTRA` | `TIPO_MUESTRA` | `02_muestras.ID_TIPO_MUESTRA` |
+| `Catalogos_Muestras/tipos_cultivo.csv` | `ID_TIPO_CULTIVO` | `TIPO_CULTIVO` | `02_muestras.ID_TIPO_CULTIVO` |
+| `Catalogos_Muestras/partes_planta.csv` | `ID_PARTE_PLANTA` | `PARTE_ESTUDIADA` | `02_muestras.ID_PARTE_PLANTA` |
+| `Catalogos_Muestras/ubicaciones.csv` | `ID_UBICACION` | `ORIGEN_GEOGRAFICO` | `02_muestras.ID_UBICACION` |
+| `Catalogos_Muestras/metodos_extraccion.csv` | `ID_METODO_EXTRACCION` | `METODO_EXTRACCION` | `02_muestras.ID_METODO_EXTRACCION` |
+| `Catalogos_Muestras/solventes_extraccion.csv` | `ID_SOLVENTE` | `SOLVENTE_EXTRACCION` | `02_muestras.ID_SOLVENTE` |
+| `Catalogos_Muestras/columnas_cromatograficas.csv` | `ID_COLUMNA` | `COLUMNA_CROMATOGRAFICA` | `02_muestras.ID_COLUMNA` |
+| `Catalogos_Muestras/factores_experimentales.csv` | `ID_FACTOR` | `FACTOR` | `03_muestra_factor.ID_FACTOR` |
+| `Catalogos_Picos/metabolitos.csv` | `ID_METABOLITO` | `NOMBRE_METABOLITO` (+ `CLASE_QUIMICA`, `SUPERCLASE_QUIMICA`) | `05_picos.ID_METABOLITO` |
+| `Catalogos_Picos/niveles_identificacion.csv` | `ID_NIVEL` | `NIVEL_IDENTIFICACION` (I–IV) | `05_picos.ID_NIVEL` |
+| `Catalogos_Especie/tipos_planta.csv` | `ID_TIPO_PLANTA` | `TIPO_PLANTA` | `01_especies.ID_TIPO_PLANTA` |
+| `Catalogos_Especie/ciclos_vida.csv` | `ID_CICLO_VIDA` | `CICLO_VIDA` | `01_especies.ID_CICLO_VIDA` |
+| `Catalogos_Especie/habitos_crecimiento.csv` | `ID_HABITO_CRECIMIENTO` | `HABITO_CRECIMIENTO` | `01_especies.ID_HABITO_CRECIMIENTO` |
+| `Catalogos_Especie/reinos.csv` | `ID_REINO` | `REINO` | `01_especies.ID_REINO` |
+| `Catalogos_Especie/filos.csv` | `ID_FILO` | `FILO` | `01_especies.ID_FILO` |
+| `Catalogos_Especie/clases_taxonomicas.csv` | `ID_CLASE_TAXONOMICA` | `CLASE_TAXONOMICA` | `01_especies.ID_CLASE_TAXONOMICA` |
+| `Catalogos_Especie/ordenes.csv` | `ID_ORDEN` | `ORDEN` | `01_especies.ID_ORDEN` |
+| `Catalogos_Especie/familias.csv` | `ID_FAMILIA` | `FAMILIA` | `01_especies.ID_FAMILIA` |
+| `Catalogos_Especie/generos.csv` | `ID_GENERO` | `GENERO` | `01_especies.ID_GENERO` |
+
+---
+
+## Ejemplo mínimo (una especie, un resultado de actividad, un pico)
 
 **`01_especies.csv`**
 ```
-ID_ESPECIE,NOMBRE_CIENTIFICO,REINO,FILO,CLASE_TAXONOMICA,ORDEN,FAMILIA,GENERO,ESPECIE,TIPO_PLANTA,CICLO_VIDA,HABITO_CRECIMIENTO
-ESP_001,Passiflora edulis,Plantae,Tracheophyta,Magnoliopsida,Malpighiales,Passifloraceae,Passiflora,edulis,Liana,Perenne,Trepadora
+ID_ESPECIE,NOMBRE_CIENTIFICO,ID_REINO,ID_FILO,ID_CLASE_TAXONOMICA,ID_ORDEN,ID_FAMILIA,ID_GENERO,ESPECIE,ID_TIPO_PLANTA,ID_CICLO_VIDA,ID_HABITO_CRECIMIENTO
+1,Passiflora edulis,1,1,1,1,1,1,edulis,1,1,1
+```
+
+**`Catalogos_Especie/tipos_planta.csv` / `ciclos_vida.csv` / `reinos.csv` / ... / `generos.csv`**
+```
+ID_TIPO_PLANTA,TIPO_PLANTA,DESCRIPCION
+1,Liana,
+
+ID_REINO,REINO,DESCRIPCION
+1,Plantae,
 ```
 
 **`02_muestras.csv`**
 ```
-ID_MUESTRA,ID_MUESTRA_FISICA,TIPO_MUESTRA,LOTE,ID_ESPECIE,...,MODO_IONIZACION,...
-100_MB_53_POS,100_MB_53,Sample,LOTE_2026_02,ESP_001,...,POS,...
-100_MB_53_NEG,100_MB_53,Sample,LOTE_2026_02,ESP_001,...,NEG,...
-100_MB_BLK_02,100_MB_BLK_02,Blank,LOTE_2026_02,,...,NEG,...
-100_MB_QC_07,100_MB_QC_07,QC,LOTE_2026_02,,...,NEG,...
+ID_MUESTRA,CODIGO_MUESTRA,ID_MUESTRA_FISICA,CODIGO_MUESTRA_FISICA,ID_TIPO_MUESTRA,LOTE,ID_ESPECIE,...,MODO_IONIZACION,...
+1,100_MB_53_POS,1,100_MB_53,1,LOTE_2026_02,1,...,POS,...
+2,100_MB_53_NEG,1,100_MB_53,1,LOTE_2026_02,1,...,NEG,...
 ```
 
-**`03_muestra_actividad.csv`** (una sola vez por extracto, no se repite por POS/NEG)
+**`03_muestra_factor.csv`** (usa `Catalogos_Muestras/factores_experimentales.csv`)
 ```
-ID_MUESTRA_FISICA,ACTIVIDAD_BIOLOGICA,VALOR_RESULTADO
-100_MB_53,antioxidante,42.3
-100_MB_53,antimicrobiano,
+ID_MUESTRA,ID_FACTOR,VALOR
+1,1,Luz
+1,2,Temprana (4-6 años)
+2,1,Luz
+2,2,Temprana (4-6 años)
 ```
 
-**`04_picos.csv`** (por corrida — POS y NEG tienen picos distintos)
+**`04_especie_actividad.csv`** (usa los 6 catálogos de `Catalogos_Actividad_Biologica/`)
 ```
-ID_MUESTRA,ID_FEATURE,RELACION_MASA_CARGA,TIEMPO_RETENCION_MINUTOS,ALTURA_PICO,NOMBRE_METABOLITO,NIVEL_IDENTIFICACION,CLASE_QUIMICA,SUPERCLASE_QUIMICA
-100_MB_53_NEG,,367.10,5.23,845210,Ácido clorogénico,I,Ácido fenólico,Polifenol
-100_MB_53_POS,,369.12,5.24,612300,,IV,,
+ID_ESPECIE,ID_ACTIVIDAD,ID_OBJETIVO,ID_METRICA,VALOR_NUMERICO,ID_UNIDAD,ID_CONDICION_ENSAYO,ID_REFERENCIA
+1,1,1,1,42.3,1,1,1
+```
+
+**`05_picos.csv`** (usa los 2 catálogos de `Catalogos_Picos/`)
+```
+ID_MUESTRA,ID_FEATURE,RELACION_MASA_CARGA,TIEMPO_RETENCION_MINUTOS,ALTURA_PICO,ID_METABOLITO,ID_NIVEL
+1,,367.10,5.23,845210,2,1
+2,,369.12,5.24,612300,,4
 ```
 
 ---
 
 ## Siguiente paso (cuando haya datos reales cargados)
 
-Con estas 4 tablas llenas, el pivot a matriz "ancha" lista para modelar
+Con estas 30 tablas llenas, el pivot a matriz "ancha" lista para modelar
 (muestras × metabolitos, combinando POS+NEG por `ID_MUESTRA_FISICA`, con la
-taxonomía traída de `01_especies.csv` vía `ID_ESPECIE`, más el target de
-actividad biológica — categórico y/o numérico) se genera con un script. Ya
+taxonomía traída de `01_especies.csv`, más el target de actividad biológica)
+requiere hacer join con cada catálogo para volver a tener los nombres
+legibles antes de presentarlo — el script de construcción se encarga de eso,
+el dataset normalizado no está pensado para leerse "a ojo" fila por fila. Ya
 quedó esbozado en la conversación y lo puedo convertir en un `.py` real
 dentro de esta carpeta cuando tengas los primeros datos consolidados.
 
@@ -197,7 +420,7 @@ dentro de esta carpeta cuando tengas los primeros datos consolidados.
 
 Esta carpeta (`Datos/Base/`) es el **molde vacío**: solo referencia de columnas, sin
 filas. Los datos reales, ya llenados a partir de un artículo + sus batches de MZmine, se
-guardan versionados en `Datos/Dataset/Consolidados/Version N/`, cada una con su propio
-script de construcción (`build_versionN.py`) y notas de las decisiones tomadas
-(`NOTAS_VERSIONN.md`). Qué artículo se cruzó con qué batch para producir cada versión
-queda registrado en `Datos/Dataset/Consolidados/00_articulos_batches.csv`.
+guardan en `Datos/Dataset/Consolidados/` — a la fecha de esta reorganización esa carpeta
+**todavía sigue con la estructura plana anterior y códigos con prefijo como ID** (sin las
+subcarpetas `Catalogos_*`, sin la regla de ID entero), pendiente de aplicarle el mismo
+reordenamiento cuando se decida hacerlo.
