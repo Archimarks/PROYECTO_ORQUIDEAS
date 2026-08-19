@@ -1,0 +1,5 @@
+﻿ID_ORIGEN_PROCESAMIENTO,ORIGEN_PROCESAMIENTO,DESCRIPCION
+1,BATCH1_NEG,Hoja 'Sheet 1' del batch NEG
+2,BATCH2_Pos_1,"Hoja 'Pos_1' del batch POS (FastDDA 5 iones, merge con full-scan)"
+3,BATCH2_Pos_2,"Hoja 'Pos_2' del batch POS (FastDDA 15 iones, merge con full-scan)"
+4,BATCH2_Hoja1,Hoja 'Hoja1' del batch POS (pipeline adicional)

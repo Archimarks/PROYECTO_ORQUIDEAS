@@ -1,6 +1,6 @@
 # Esquema base del dataset (molde)
 
-Este dataset está normalizado en **30 tablas**: 25 son **catálogos** (listas
+Este dataset está normalizado en **31 tablas**: 26 son **catálogos** (listas
 cortas de referencia, con un ID + el valor + una descripción, reutilizadas
 por muchas filas) y 5 son tablas **hub/hecho** (`especies`, `muestras`,
 `muestra_factor`, `especie_actividad`, `picos`) que se quedan sueltas en la
@@ -43,7 +43,8 @@ Datos/Base/
 │   └── factores_experimentales.csv
 └── Catalogos_Picos/
     ├── metabolitos.csv
-    └── niveles_identificacion.csv
+    ├── niveles_identificacion.csv
+    └── origenes_procesamiento.csv
 ```
 
 `01_especies.csv` vive en la raíz (no dentro de `Catalogos_Especie/`) porque,
@@ -135,6 +136,7 @@ experimental de *este* estudio) se sacaron a un catálogo de factores +
 | `Catalogos_Muestras/factores_experimentales.csv` | catálogo | nombre de un factor/variable experimental (luz, edad, temperatura...) |
 | `Catalogos_Picos/metabolitos.csv` | catálogo | nombre de compuesto + clase/superclase química |
 | `Catalogos_Picos/niveles_identificacion.csv` | catálogo | confianza de identificación MS (I–IV) |
+| `Catalogos_Picos/origenes_procesamiento.csv` | catálogo | de qué pipeline/hoja de procesamiento MS viene un pico |
 
 ---
 
@@ -308,12 +310,22 @@ Una fila por cada pico/metabolito detectado en una corrida (`ID_MUESTRA`).
 | Columna | Descripción | Notas |
 |---|---|---|
 | `ID_MUESTRA` | debe existir en `02_muestras.csv` (nivel corrida, no extracto) | |
-| `ID_FEATURE` | identificador entero del pico/feature | vacío hasta correr el script de alineación m/z+RT |
+| `ID_FEATURE` | identificador entero del pico/feature | único dentro de su `ID_ORIGEN_PROCESAMIENTO`, no globalmente — ver nota abajo |
+| `ID_ORIGEN_PROCESAMIENTO` | debe existir en `Catalogos_Picos/origenes_procesamiento.csv` | de qué pipeline/hoja de procesamiento MS viene este pico |
 | `RELACION_MASA_CARGA` ($m/z$) | "peso" de la molécula leído por el equipo | |
 | `TIEMPO_RETENCION_MINUTOS` | minuto en que el compuesto salió de la columna | |
 | `ALTURA_PICO` | abundancia/concentración relativa del compuesto | sé consistente: si mezclas altura y área entre corridas, anótalo |
 | `ID_METABOLITO` | debe existir en `Catalogos_Picos/metabolitos.csv` | vacío si no se identificó — válido y esperado (la mayoría de los picos no se identifican) |
 | `ID_NIVEL` | debe existir en `Catalogos_Picos/niveles_identificacion.csv` | confianza de la identificación, I a IV — se llena incluso si `ID_METABOLITO` está vacío (nivel IV = desconocido) |
+
+**Por qué existe `ID_ORIGEN_PROCESAMIENTO`:** cuando un mismo lote de corridas se
+procesa con más de un pipeline/parámetro de MZmine (ej. distintas hojas de
+un mismo batch, cada una con su propia detección de features), el
+`ID_FEATURE`/`row_ID` que genera cada pipeline **no es comparable entre
+ellos** — son numeraciones independientes, no el mismo feature renumerado.
+Sin esta columna, dos picos de pipelines distintos con el mismo
+`ID_FEATURE` se verían como si fueran el mismo feature. Si tu dataset viene
+de un solo pipeline, esta columna simplemente apunta siempre al mismo valor.
 
 ---
 
@@ -335,14 +347,15 @@ necesiten.
 | `Catalogos_Actividad_Biologica/referencias.csv` | `ID_REFERENCIA` | `REFERENCIA_CITA` | `04_especie_actividad.ID_REFERENCIA` |
 | `Catalogos_Muestras/tipos_muestra.csv` | `ID_TIPO_MUESTRA` | `TIPO_MUESTRA` | `02_muestras.ID_TIPO_MUESTRA` |
 | `Catalogos_Muestras/tipos_cultivo.csv` | `ID_TIPO_CULTIVO` | `TIPO_CULTIVO` | `02_muestras.ID_TIPO_CULTIVO` |
-| `Catalogos_Muestras/partes_planta.csv` | `ID_PARTE_PLANTA` | `PARTE_ESTUDIADA` | `02_muestras.ID_PARTE_PLANTA` |
-| `Catalogos_Muestras/ubicaciones.csv` | `ID_UBICACION` | `ORIGEN_GEOGRAFICO` | `02_muestras.ID_UBICACION` |
+| `Catalogos_Muestras/partes_planta.csv` | `ID_PARTE_PLANTA` | `PARTE_PLANTA` | `02_muestras.ID_PARTE_PLANTA` |
+| `Catalogos_Muestras/ubicaciones.csv` | `ID_UBICACION` | `UBICACION` | `02_muestras.ID_UBICACION` |
 | `Catalogos_Muestras/metodos_extraccion.csv` | `ID_METODO_EXTRACCION` | `METODO_EXTRACCION` | `02_muestras.ID_METODO_EXTRACCION` |
 | `Catalogos_Muestras/solventes_extraccion.csv` | `ID_SOLVENTE` | `SOLVENTE_EXTRACCION` | `02_muestras.ID_SOLVENTE` |
 | `Catalogos_Muestras/columnas_cromatograficas.csv` | `ID_COLUMNA` | `COLUMNA_CROMATOGRAFICA` | `02_muestras.ID_COLUMNA` |
 | `Catalogos_Muestras/factores_experimentales.csv` | `ID_FACTOR` | `FACTOR` | `03_muestra_factor.ID_FACTOR` |
 | `Catalogos_Picos/metabolitos.csv` | `ID_METABOLITO` | `NOMBRE_METABOLITO` (+ `CLASE_QUIMICA`, `SUPERCLASE_QUIMICA`) | `05_picos.ID_METABOLITO` |
 | `Catalogos_Picos/niveles_identificacion.csv` | `ID_NIVEL` | `NIVEL_IDENTIFICACION` (I–IV) | `05_picos.ID_NIVEL` |
+| `Catalogos_Picos/origenes_procesamiento.csv` | `ID_ORIGEN_PROCESAMIENTO` | `ORIGEN_PROCESAMIENTO` | `05_picos.ID_ORIGEN_PROCESAMIENTO` |
 | `Catalogos_Especie/tipos_planta.csv` | `ID_TIPO_PLANTA` | `TIPO_PLANTA` | `01_especies.ID_TIPO_PLANTA` |
 | `Catalogos_Especie/ciclos_vida.csv` | `ID_CICLO_VIDA` | `CICLO_VIDA` | `01_especies.ID_CICLO_VIDA` |
 | `Catalogos_Especie/habitos_crecimiento.csv` | `ID_HABITO_CRECIMIENTO` | `HABITO_CRECIMIENTO` | `01_especies.ID_HABITO_CRECIMIENTO` |
@@ -394,18 +407,18 @@ ID_ESPECIE,ID_ACTIVIDAD,ID_OBJETIVO,ID_METRICA,VALOR_NUMERICO,ID_UNIDAD,ID_CONDI
 1,1,1,1,42.3,1,1,1
 ```
 
-**`05_picos.csv`** (usa los 2 catálogos de `Catalogos_Picos/`)
+**`05_picos.csv`** (usa los 3 catálogos de `Catalogos_Picos/`)
 ```
-ID_MUESTRA,ID_FEATURE,RELACION_MASA_CARGA,TIEMPO_RETENCION_MINUTOS,ALTURA_PICO,ID_METABOLITO,ID_NIVEL
-1,,367.10,5.23,845210,2,1
-2,,369.12,5.24,612300,,4
+ID_MUESTRA,ID_FEATURE,ID_ORIGEN_PROCESAMIENTO,RELACION_MASA_CARGA,TIEMPO_RETENCION_MINUTOS,ALTURA_PICO,ID_METABOLITO,ID_NIVEL
+1,42,1,367.10,5.23,845210,2,1
+2,42,1,369.12,5.24,612300,,4
 ```
 
 ---
 
 ## Siguiente paso (cuando haya datos reales cargados)
 
-Con estas 30 tablas llenas, el pivot a matriz "ancha" lista para modelar
+Con estas 31 tablas llenas, el pivot a matriz "ancha" lista para modelar
 (muestras × metabolitos, combinando POS+NEG por `ID_MUESTRA_FISICA`, con la
 taxonomía traída de `01_especies.csv`, más el target de actividad biológica)
 requiere hacer join con cada catálogo para volver a tener los nombres
@@ -420,7 +433,9 @@ dentro de esta carpeta cuando tengas los primeros datos consolidados.
 
 Esta carpeta (`Datos/Base/`) es el **molde vacío**: solo referencia de columnas, sin
 filas. Los datos reales, ya llenados a partir de un artículo + sus batches de MZmine, se
-guardan en `Datos/Dataset/Consolidados/` — a la fecha de esta reorganización esa carpeta
-**todavía sigue con la estructura plana anterior y códigos con prefijo como ID** (sin las
-subcarpetas `Catalogos_*`, sin la regla de ID entero), pendiente de aplicarle el mismo
-reordenamiento cuando se decida hacerlo.
+guardan en `Datos/Dataset/Consolidados/`. A la fecha de esta nota, esa carpeta está
+prácticamente vacía a propósito (en proceso de reconstrucción bajo este esquema) y solo
+tiene `00_articulos.csv` (hub, 1 fila por artículo) y `01_batches.csv` (hecho, 1 fila por
+batch de MS, con `ID_ARTICULO` como llave) — ya con IDs enteros, siguiendo la misma regla
+que el resto del molde. El resto de las tablas (`especies`, `muestras`,
+`especie_actividad`, `picos` y sus catálogos) todavía no se ha reconstruido ahí.

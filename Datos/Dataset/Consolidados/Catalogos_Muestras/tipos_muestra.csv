@@ -1,0 +1,5 @@
+﻿ID_TIPO_MUESTRA,TIPO_MUESTRA,DESCRIPCION
+1,Sample,Muestra real de la planta
+2,Blank,"Blanco de ruido (agua ultrapura), sin especie real"
+3,QC,"Pool de control de calidad, mezcla de todas las muestras"
+4,SubQC,"Pool de control por nivel de un factor (ubicacion, edad o luz)"
