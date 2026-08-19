@@ -1,5 +1,0 @@
-﻿ID_TIPO_MUESTRA,TIPO_MUESTRA,DESCRIPCION
-TM_01,Sample,Muestra real de la planta
-TM_02,Blank,"Blanco de ruido (ej. agua ultrapura), sin especie real"
-TM_03,QC,"Pool de control de calidad, mezcla de todas las muestras"
-TM_04,SubQC,Pool de control por nivel de un factor (ej. una sola ubicacion)

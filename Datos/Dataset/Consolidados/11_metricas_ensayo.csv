@@ -1,8 +1,0 @@
-﻿ID_METRICA,METRICA,DESCRIPCION
-MET_01,MIC,Concentracion Inhibitoria Minima
-MET_02,Halo de inhibicion,Diametro del halo de inhibicion en ensayo de disco/pozo
-MET_03,LD50,Dosis letal 50 (dosis que mata al 50% de los organismos de prueba)
-MET_04,LC50,Concentracion letal 50 (concentracion que mata al 50% de los organismos de prueba)
-MET_05,% remocion de NO,Porcentaje de remocion quimica de oxido nitrico
-MET_06,% supresion de produccion de NO,Porcentaje de supresion de produccion celular de oxido nitrico
-MET_07,% contenido,Porcentaje de contenido de un compuesto en la matriz vegetal
