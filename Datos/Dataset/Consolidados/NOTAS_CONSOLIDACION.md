@@ -110,7 +110,35 @@ Excel normalizado a `Early`). Se omiten para `Blank`, para `QC` (pool total,
 mezcla todo) y para `SubQC` agrupado por un factor que no sea ese (donde el
 valor es `QC`/`Other enviroment factors`/`Blank`, no un valor real medible).
 
-## 5. Actividad biológica
+## 5. Solvente de extracción como mezcla, a nivel de BATCH (no de muestra)
+
+`SOLVENTE_EXTRACCION` empezó como un solo texto en `04_muestras.csv`
+("Agua con 2% ácido fórmico y 10% acetonitrilo"). Se descompuso en:
+
+- `Catalogos_Muestras/solventes_extraccion.csv` — catálogo de **componentes
+  puros** (`Agua`, `Acido Formico`, `Acetonitrilo`), sin porcentaje.
+- `02_batch_solvente.csv` — tabla pivote `ID_BATCH, ID_SOLVENTE, PORCENTAJE`.
+
+Primero se armó por `ID_MUESTRA` (603 filas, 201 muestras × 3 componentes),
+pero el mismo protocolo de extracción se usó para **todo el estudio** — la
+sección 2.4.1 del artículo dice explícitamente que la preparación LC-MS
+"followed the HPLC sample preparation protocol (Section 2.2.1)", el mismo
+diluyente para NEG y POS. Repetirlo por cada una de las 201 muestras era
+redundante: la granularidad real es el **batch** (`01_batches.csv`, que ya
+existía), así que se re-hizo como `ID_BATCH, ID_SOLVENTE, PORCENTAJE` — 6
+filas (2 batches × 3 componentes) en vez de 603, sin perder la capacidad de
+que un batch futuro use una mezcla distinta. El porcentaje de agua (88%) se
+calculó como el resto hasta 100% — el artículo solo da explícito "2.0%
+formic acid and 10% acetonitrile".
+
+Nota: `Datos/Base/` (el molde genérico) mantiene el patrón por-muestra
+(`ID_MUESTRA, ID_SOLVENTE, PORCENTAJE`) como default razonable, porque no
+todo dataset futuro va a tener el concepto de "batch" expuesto como aquí
+(`00_articulos.csv`/`01_batches.csv` son específicos de este dataset, no
+forman parte del molde). Si un dataset futuro sí organiza sus datos por
+batch, puede replicar este mismo ajuste.
+
+## 6. Actividad biológica
 
 `05_especie_actividad.csv` quedó **vacío** — esta reconstrucción solo usó el
 artículo `01_ilex_guayusa.pdf` (que no reporta actividad biológica propia) y

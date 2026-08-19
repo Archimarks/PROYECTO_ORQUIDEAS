@@ -10,14 +10,18 @@ Reconstruye TODAS las tablas de Consolidados siguiendo el esquema de Datos/Base/
 subcarpetas). No toca 00_articulos.csv ni 01_batches.csv (ya existian).
 
 Notas de diseno especificas de este dataset real (no estan en el molde generico):
-  - SECUENCIA_INYECCION y VISITA se agregan como columnas extra en 03_muestras.csv
+  - SECUENCIA_INYECCION y VISITA se agregan como columnas extra en 04_muestras.csv
     (Injection_order / Visit del Excel) -- no rompen el molde, solo lo extienden.
   - El batch POS trae 3 pipelines de procesamiento (Pos_1, Pos_2, Hoja1) cuyos
     row_ID no son comparables entre si -> catalogo nuevo ID_ORIGEN_PROCESAMIENTO
-    en 06_picos.csv (ya reflejado tambien en el molde de Base).
+    en 07_picos.csv (ya reflejado tambien en el molde de Base).
   - El nivel de identificacion (I/II) de los 16 metabolitos nombrados se tomo de
     la Tabla 3 del articulo (fuente mas confiable que el Excel, que lo deja
     vacio o inconsistente en algunas hojas/pipelines).
+  - El solvente de extraccion es una mezcla (agua/acido formico/acetonitrilo) y
+    se aplico igual a NEG y POS (secciones 2.2.1 y 2.4.1 del articulo: el
+    protocolo LC-MS reusa el mismo diluyente de la cuantificacion HPLC) -> vive
+    a nivel de BATCH (02_batch_solvente.csv), no por muestra individual.
 """
 import csv
 import openpyxl
@@ -50,18 +54,28 @@ w("Catalogos_Especie/ciclos_vida.csv", ["ID_CICLO_VIDA", "CICLO_VIDA", "DESCRIPC
 w("Catalogos_Especie/habitos_crecimiento.csv", ["ID_HABITO_CRECIMIENTO", "HABITO_CRECIMIENTO", "DESCRIPCION"], [[1, "Erecta", ""]])
 
 # ---------------------------------------------------------------------------
-# 2. 02_especies.csv (hub)
+# 2. 02_batch_solvente.csv -- composicion del solvente de extraccion, por BATCH
+#    (no por muestra: el mismo protocolo se uso para NEG y POS, art. 2.2.1/2.4.1)
 # ---------------------------------------------------------------------------
-print("=== 02_especies.csv ===")
+print("=== 02_batch_solvente.csv ===")
+# ID_BATCH viene de 01_batches.csv (1=NEG, 2=POS), ya existente -- no se regenera aqui.
+SOLVENTE_MEZCLA = [(1, 88), (2, 2), (3, 10)]  # Agua, Acido Formico, Acetonitrilo
+batch_solvente_rows = [[id_batch, id_sol, pct] for id_batch in (1, 2) for id_sol, pct in SOLVENTE_MEZCLA]
+w("02_batch_solvente.csv", ["ID_BATCH", "ID_SOLVENTE", "PORCENTAJE"], batch_solvente_rows)
+
+# ---------------------------------------------------------------------------
+# 3. 03_especies.csv (hub)
+# ---------------------------------------------------------------------------
+print("=== 03_especies.csv ===")
 w(
-    "02_especies.csv",
+    "03_especies.csv",
     ["ID_ESPECIE", "NOMBRE_CIENTIFICO", "ID_REINO", "ID_FILO", "ID_CLASE_TAXONOMICA",
      "ID_ORDEN", "ID_FAMILIA", "ID_GENERO", "ESPECIE", "ID_TIPO_PLANTA", "ID_CICLO_VIDA", "ID_HABITO_CRECIMIENTO"],
     [[1, "Ilex guayusa", 1, 1, 1, 1, 1, 1, "guayusa", 1, 1, 1]],
 )
 
 # ---------------------------------------------------------------------------
-# 3. Catalogos de muestras (estaticos + factores)
+# 3b. Catalogos de muestras (estaticos + factores)
 # ---------------------------------------------------------------------------
 print("=== Catalogos_Muestras ===")
 w("Catalogos_Muestras/tipos_muestra.csv", ["ID_TIPO_MUESTRA", "TIPO_MUESTRA", "DESCRIPCION"], [
@@ -81,8 +95,13 @@ w("Catalogos_Muestras/ubicaciones.csv", ["ID_UBICACION", "UBICACION", "DESCRIPCI
 ])
 w("Catalogos_Muestras/metodos_extraccion.csv", ["ID_METODO_EXTRACCION", "METODO_EXTRACCION", "DESCRIPCION"],
   [[1, "Ultrasonido (sonicacion 20 min, agitacion manual)", ""]])
-w("Catalogos_Muestras/solventes_extraccion.csv", ["ID_SOLVENTE", "SOLVENTE_EXTRACCION", "DESCRIPCION"],
-  [[1, "Agua con 2% acido formico y 10% acetonitrilo", ""]])
+# Componentes puros del solvente (no la mezcla completa) -- la mezcla real
+# por batch se arma en 02_batch_solvente.csv con su porcentaje.
+w("Catalogos_Muestras/solventes_extraccion.csv", ["ID_SOLVENTE", "SOLVENTE_EXTRACCION", "DESCRIPCION"], [
+    [1, "Agua", ""],
+    [2, "Acido Formico", ""],
+    [3, "Acetonitrilo", ""],
+])
 w("Catalogos_Muestras/columnas_cromatograficas.csv", ["ID_COLUMNA", "COLUMNA_CROMATOGRAFICA", "DESCRIPCION"],
   [[1, "Fase Reversa (RP) - ACQUITY UPLC CSH C18 1.7um (3.0x50mm)", ""]])
 w("Catalogos_Muestras/factores_experimentales.csv", ["ID_FACTOR", "FACTOR", "DESCRIPCION"], [
@@ -134,9 +153,9 @@ print(f"  POS: {len(pos_samples)} muestras")
 all_samples = neg_samples + pos_samples
 
 # ---------------------------------------------------------------------------
-# 5. Asignar ID_MUESTRA / ID_MUESTRA_FISICA (enteros) y armar 03_muestras.csv
+# 5. Asignar ID_MUESTRA / ID_MUESTRA_FISICA (enteros) y armar 04_muestras.csv
 # ---------------------------------------------------------------------------
-print("=== armando 03_muestras.csv y 04_muestra_factor.csv ===")
+print("=== armando 04_muestras.csv y 05_muestra_factor.csv ===")
 
 TM = {"Sample": 1, "Blank": 2, "QC": 3, "Sub_Quality_Control": 4}
 UBI = {"Talag": 1, "Alto Pano": 2, "Alto Tena": 3}  # resto (QC/Other/Blank) se resuelve aparte
@@ -168,7 +187,6 @@ for idx, d in enumerate(all_samples, start=1):
     id_tipo_cultivo = "" if es_blank else 1
     id_parte_planta = "" if es_blank else 1
     id_metodo = 1
-    id_solvente = 1
     id_columna = 1
 
     loc = d.get("Location_Factor")
@@ -190,7 +208,7 @@ for idx, d in enumerate(all_samples, start=1):
     muestras_rows.append([
         idx, codigo_muestra, id_muestra_fisica, codigo_fisico, id_tipo_muestra, lote,
         id_especie, id_tipo_cultivo, id_parte_planta, id_ubicacion,
-        id_metodo, id_solvente, modo_ion, id_columna, visita, inj,
+        id_metodo, modo_ion, id_columna, visita, inj,
     ])
 
     # --- factores experimentales: solo si el valor es especifico (no QC/Blank/Other) ---
@@ -202,19 +220,19 @@ for idx, d in enumerate(all_samples, start=1):
         factor_rows.append([idx, 2, AGE_ES[age]])
 
 w(
-    "03_muestras.csv",
+    "04_muestras.csv",
     ["ID_MUESTRA", "CODIGO_MUESTRA", "ID_MUESTRA_FISICA", "CODIGO_MUESTRA_FISICA", "ID_TIPO_MUESTRA", "LOTE",
      "ID_ESPECIE", "ID_TIPO_CULTIVO", "ID_PARTE_PLANTA", "ID_UBICACION",
-     "ID_METODO_EXTRACCION", "ID_SOLVENTE", "MODO_IONIZACION", "ID_COLUMNA", "VISITA", "SECUENCIA_INYECCION"],
+     "ID_METODO_EXTRACCION", "MODO_IONIZACION", "ID_COLUMNA", "VISITA", "SECUENCIA_INYECCION"],
     muestras_rows,
 )
-w("04_muestra_factor.csv", ["ID_MUESTRA", "ID_FACTOR", "VALOR"], factor_rows)
+w("05_muestra_factor.csv", ["ID_MUESTRA", "ID_FACTOR", "VALOR"], factor_rows)
 
 # mapa CODIGO_MUESTRA -> ID_MUESTRA, para usar al leer los picos
 codigo_a_id_muestra = {r[1]: r[0] for r in muestras_rows}
 
 # ---------------------------------------------------------------------------
-# 6. 05_especie_actividad.csv -- vacio (no se dio fuente de actividad biologica esta vez)
+# 6. 06_especie_actividad.csv -- vacio (no se dio fuente de actividad biologica esta vez)
 # ---------------------------------------------------------------------------
 print("=== catalogos de actividad biologica (vacios, sin fuente esta vez) ===")
 for fname, idcol, valcol in [
@@ -227,7 +245,7 @@ for fname, idcol, valcol in [
 ]:
     w(f"Catalogos_Actividad_Biologica/{fname}", [idcol, valcol, "DESCRIPCION"], [])
 
-w("05_especie_actividad.csv",
+w("06_especie_actividad.csv",
   ["ID_ESPECIE", "ID_ACTIVIDAD", "ID_OBJETIVO", "ID_METRICA", "VALOR_NUMERICO", "ID_UNIDAD", "ID_CONDICION_ENSAYO", "ID_REFERENCIA"],
   [])
 
@@ -281,9 +299,9 @@ w("Catalogos_Picos/origenes_procesamiento.csv", ["ID_ORIGEN_PROCESAMIENTO", "ORI
 ])
 
 # ---------------------------------------------------------------------------
-# 8. 06_picos.csv -- streaming, ~1.28M filas
+# 8. 07_picos.csv -- streaming, ~1.28M filas
 # ---------------------------------------------------------------------------
-print("=== 06_picos.csv (streaming, puede tardar) ===")
+print("=== 07_picos.csv (streaming, puede tardar) ===")
 
 PIPELINES = [
     # (workbook, sheet, header_row, cols: dict nombre->indice, id_origen, suffix)
@@ -304,7 +322,7 @@ PIPELINES = [
 total_rows = 0
 n_feat_cols = 9  # todas las hojas tienen 8 o 9 columnas de feature antes de las muestras; usamos el max real por hoja abajo
 
-with open("06_picos.csv", "w", encoding="utf-8-sig", newline="") as fout:
+with open("07_picos.csv", "w", encoding="utf-8-sig", newline="") as fout:
     writer = csv.writer(fout)
     writer.writerow(["ID_MUESTRA", "ID_FEATURE", "ID_ORIGEN_PROCESAMIENTO", "RELACION_MASA_CARGA",
                       "TIEMPO_RETENCION_MINUTOS", "ALTURA_PICO", "ID_METABOLITO", "ID_NIVEL"])
@@ -352,7 +370,7 @@ with open("06_picos.csv", "w", encoding="utf-8-sig", newline="") as fout:
             total_rows += len(rows_out)
         print(f"  {sheet_name}: {n_rows_sheet} features x {len(sample_cols)} muestras")
 
-print(f"06_picos.csv: {total_rows} filas totales")
+print(f"07_picos.csv: {total_rows} filas totales")
 
 wb_neg.close()
 wb_pos.close()

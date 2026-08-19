@@ -1,2 +1,4 @@
 ﻿ID_SOLVENTE,SOLVENTE_EXTRACCION,DESCRIPCION
-1,Agua con 2% acido formico y 10% acetonitrilo,
+1,Agua,
+2,Acido Formico,
+3,Acetonitrilo,
